@@ -649,4 +649,558 @@ export default function LedgerApp() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs sm:text-sm text-gray-600">Status:</span>
-                  <span className={`inline-flex px-2 sm:px-3 py-1 rounded-full text-xs font-bold
+                  <span className={`inline-flex px-2 sm:px-3 py-1 rounded-full text-xs font-bold ${
+                    selectedCustomer.drCr === 'DR' 
+                      ? 'bg-red-100 text-red-700' 
+                      : selectedCustomer.drCr === 'CR'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {selectedCustomer.drCr}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-gray-600">Transactions:</span>
+                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{customerTransactions.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Transaction Stats</h3>
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-gray-600">Filtered:</span>
+                  <span className="text-sm sm:text-base font-semibold text-gray-800">{formatCurrency(txStats.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-gray-600">Completed:</span>
+                  <span className="text-green-600 font-semibold text-sm sm:text-base">{txStats.completed}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-gray-600">Pending:</span>
+                  <span className="text-orange-600 font-semibold text-sm sm:text-base">{txStats.pending}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Quick Actions</h3>
+              <div className="grid grid-cols-2 gap-2 sm:space-y-0 sm:grid-cols-1 sm:gap-3">
+                <button
+                  onClick={exportToCSV}
+                  disabled={filteredTx.length === 0}
+                  className="flex items-center justify-center px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+                >
+                  <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => setDateRange({ startDate: '', endDate: '' })}
+                  className="flex items-center justify-center px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs sm:text-sm"
+                >
+                  <Filter className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  Clear Filter
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center">
+              <Filter className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-blue-500" />
+              Filter by Date
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">End Date</label>
+                <input
+                  type="date"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-end">
+                <div className="text-xs sm:text-sm text-gray-600">
+                  Showing <span className="font-semibold">{filteredTx.length}</span> of {customerTransactions.length} transactions
+                  {dateRange.startDate && dateRange.endDate && (
+                    <span className="block text-xs text-gray-500 mt-1">
+                      {formatDate(dateRange.startDate)} to {formatDate(dateRange.endDate)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transaction History */}
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base sm:text-xl font-bold">Transactions</h2>
+                <div className="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Total: {formatCurrency(txStats.totalAmount)}</span>
+                  <span>Count: {filteredTx.length}</span>
+                </div>
+              </div>
+            </div>
+            
+            {loadingTransactions ? (
+              <div className="text-center py-12">
+                <RefreshCw className="w-8 h-8 text-blue-500 mx-auto mb-4 animate-spin" />
+                <p className="text-sm sm:text-base text-gray-500">Loading transactions...</p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile Card View */}
+                <div className="block sm:hidden divide-y divide-gray-200">
+                  {filteredTx.map((tx) => (
+                    <div key={tx.id} className="p-4 hover:bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0 mr-2">
+                          <p className="font-medium text-gray-900 text-sm truncate">{tx.description}</p>
+                          <p className="text-xs text-gray-500 mt-1">{formatDate(tx.date)}</p>
+                        </div>
+                        <span className={`font-bold text-sm ${
+                          tx.type === 'DR' ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {formatCurrency(tx.amount)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-600 font-mono">{tx.reference}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                            tx.type === 'DR' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                          }`}>
+                            {tx.type}
+                          </span>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                            tx.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {tx.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 border-b-2 border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Description</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Reference</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Amount</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Type</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredTx.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 text-gray-400 mr-2" />
+                              <span className="text-sm text-gray-700">{formatDate(tx.date)}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-medium text-gray-800 text-sm">{tx.description}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-gray-600 font-mono">{tx.reference}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`font-semibold text-sm ${
+                              tx.type === 'DR' ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {formatCurrency(tx.amount)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                              tx.type === 'DR' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                              tx.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredTx.length === 0 && (
+                  <div className="text-center py-12">
+                    <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 text-sm sm:text-lg">No transactions found</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="mt-4 sm:mt-6">
+            <button 
+              onClick={backToDashboard}
+              className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // DASHBOARD VIEW
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg sticky top-0 z-10">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <Camera className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0" />
+              <div>
+                <h1 className="text-lg sm:text-2xl font-bold">Ledger Dashboard</h1>
+                <p className="text-xs sm:text-sm text-blue-100">Live Google Sheets Sync</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm flex-1 sm:flex-initial justify-center ${
+                  autoRefresh ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-500 hover:bg-gray-600'
+                }`}
+              >
+                <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{autoRefresh ? 'Auto On' : 'Auto Off'}</span>
+                <span className="sm:hidden">Auto</span>
+              </button>
+
+              <button
+                onClick={() => fetchBalanceSheet()}
+                className="flex items-center px-2 sm:px-4 py-1.5 sm:py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs sm:text-sm flex-1 sm:flex-initial justify-center"
+              >
+                <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="mb-2 sm:mb-0">
+                <p className="text-xs sm:text-sm text-gray-600">Customers</p>
+                <p className="text-xl sm:text-3xl font-bold text-gray-800">{stats.totalCustomers}</p>
+              </div>
+              <Users className="w-8 h-8 sm:w-12 sm:h-12 text-blue-500" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="mb-2 sm:mb-0 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-600">Total DR</p>
+                <p className="text-base sm:text-2xl font-bold text-red-600 truncate">{formatCurrency(stats.totalDR).replace('PKR', '')}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 text-red-500 flex-shrink-0" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="mb-2 sm:mb-0 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-600">Total CR</p>
+                <p className="text-base sm:text-2xl font-bold text-green-600 truncate">{formatCurrency(stats.totalCR).replace('PKR', '')}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 text-green-500 flex-shrink-0" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="mb-2 sm:mb-0 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-600">Net</p>
+                <p className={`text-base sm:text-2xl font-bold truncate ${stats.netPosition >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                  {formatCurrency(Math.abs(stats.netPosition)).replace('PKR', '')}
+                </p>
+              </div>
+              <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 text-blue-500 flex-shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="relative">
+              <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search customers..."
+                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-2 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-base ${
+                  filterType === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterType('dr')}
+                className={`px-2 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-base ${
+                  filterType === 'dr' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                DR
+              </button>
+              <button
+                onClick={() => setFilterType('cr')}
+                className={`px-2 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-base ${
+                  filterType === 'cr' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                CR
+              </button>
+              <button
+                onClick={() => setFilterType('nill')}
+                className={`px-2 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-base ${
+                  filterType === 'nill' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                NILL
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex gap-2 mb-4 sm:mb-6">
+          <button
+            onClick={() => setViewMode('balance')}
+            className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-xs sm:text-base ${
+              viewMode === 'balance' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Table View</span>
+            <span className="sm:hidden">Table</span>
+          </button>
+          <button
+            onClick={() => setViewMode('customers')}
+            className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-xs sm:text-base ${
+              viewMode === 'customers' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Card View</span>
+            <span className="sm:hidden">Cards</span>
+          </button>
+        </div>
+
+        {/* Table View */}
+        {viewMode === 'balance' && (
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-between">
+              <h2 className="text-base sm:text-xl font-bold">Balance Sheet</h2>
+              {lastUpdate && (
+                <p className="text-xs sm:text-sm text-blue-100 hidden sm:block">
+                  {lastUpdate.toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+
+            {/* Mobile Card List */}
+            <div className="block sm:hidden divide-y divide-gray-200">
+              {filteredBalanceData.map((customer) => (
+                <div key={customer.id} className="p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 min-w-0 mr-2">
+                      <h3 className="font-medium text-gray-900 text-sm truncate">{customer.name}</h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Balance: <span className="font-semibold">{formatCurrency(Math.abs(customer.balance))}</span>
+                      </p>
+                    </div>
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
+                      customer.drCr === 'DR' 
+                        ? 'bg-red-100 text-red-700' 
+                        : customer.drCr === 'CR'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {customer.drCr}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => viewCustomerDetails(customer)}
+                    className="w-full inline-flex items-center justify-center px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600"
+                  >
+                    <User className="w-3 h-3 mr-1" />
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-100 border-b-2 border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Customer</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Balance</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Type</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredBalanceData.map((customer) => (
+                    <tr key={customer.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900 text-sm">{customer.name}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {formatCurrency(Math.abs(customer.balance))}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                          customer.drCr === 'DR' 
+                            ? 'bg-red-100 text-red-700' 
+                            : customer.drCr === 'CR'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {customer.drCr}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => viewCustomerDetails(customer)}
+                          className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600"
+                        >
+                          <User className="w-3 h-3 mr-1" />
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredBalanceData.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-sm sm:text-base">No customers found.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card View */}
+        {viewMode === 'customers' && (
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white flex items-center justify-between">
+              <h2 className="text-base sm:text-xl font-bold">Customer Directory</h2>
+              <p className="text-xs sm:text-sm text-green-100">{filteredBalanceData.length} found</p>
+            </div>
+
+            <div className="p-3 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {filteredBalanceData.map((customer) => (
+                  <div key={customer.id} className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-2 sm:mb-3">
+                      <h3 className="font-semibold text-gray-800 text-sm sm:text-lg truncate flex-1 mr-2">
+                        {customer.name}
+                      </h3>
+                      <span className={`inline-flex px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold flex-shrink-0 ${
+                        customer.drCr === 'DR' 
+                          ? 'bg-red-100 text-red-700' 
+                          : customer.drCr === 'CR'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {customer.drCr}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-3 sm:mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs sm:text-sm text-gray-600">Balance:</span>
+                        <span className={`font-semibold text-sm sm:text-base ${
+                          customer.drCr === 'DR' ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {formatCurrency(Math.abs(customer.balance))}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => viewCustomerDetails(customer)}
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-600"
+                    >
+                      <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                      View Details
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {filteredBalanceData.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-sm sm:text-base">No customers found.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-gray-500">
+          <p>Data syncs {autoRefresh ? 'every 30s' : 'manually'}</p>
+          <p className="mt-1">
+            Showing {filteredBalanceData.length} of {balanceSheet.length} customers
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
