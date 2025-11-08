@@ -150,59 +150,63 @@ export default function Home() {
   };
 
   const fetchData = async (id = sheetId) => {
-    if (!id) return;
+  if (!id) return;
+  
+  try {
+    const extractedId = extractSheetId(id);
     
-    try {
-      const extractedId = extractSheetId(id);
-      
-      const balanceResponse = await fetch(
-        `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet`
-      );
-      
-      if (!balanceResponse.ok) {
-        throw new Error('Could not access sheet. Make sure it is publicly accessible.');
-      }
-
-      const balanceText = await balanceResponse.text();
-      const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
-      
-      const rows = balanceJson.table.rows.slice(2);
-      const balanceData = rows.map((row, index) => ({
-        id: `customer-${index}-${Date.now()}`,
-        name: row.c[0]?.v || '',
-        balance: parseFloat(row.c[1]?.v || 0),
-        drCr: row.c[2]?.v || '',
-        link: row.c[3]?.v || ''
-      })).filter(item => item.name);
-
-      setBalanceSheet(balanceData);
-      
-      // Save to localStorage for customer pages
-      localStorage.setItem('ledger_sheet_data', JSON.stringify(balanceData));
-      
-      const totalDR = balanceData
-        .filter(item => item.drCr === 'DR')
-        .reduce((sum, item) => sum + Math.abs(item.balance), 0);
-      
-      const totalCR = balanceData
-        .filter(item => item.drCr === 'CR')
-        .reduce((sum, item) => sum + Math.abs(item.balance), 0);
-      
-      setStats({
-        totalCustomers: balanceData.length,
-        totalDR,
-        totalCR,
-        netPosition: totalDR - totalCR
-      });
-
-      setLastUpdate(new Date());
-      setError('');
-      
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Failed to fetch data. Check sheet permissions and try again.');
+    const balanceResponse = await fetch(
+      `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet`
+    );
+    
+    if (!balanceResponse.ok) {
+      throw new Error('Could not access sheet. Make sure it is publicly accessible.');
     }
-  };
+
+    const balanceText = await balanceResponse.text();
+    const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
+    
+    const rows = balanceJson.table.rows.slice(2);
+    const balanceData = rows.map((row, index) => ({
+      id: `customer-${index}-${Date.now()}`,
+      name: row.c[0]?.v || '',
+      balance: parseFloat(row.c[1]?.v || 0),
+      drCr: row.c[2]?.v || '',
+      link: row.c[3]?.v || ''
+    })).filter(item => item.name);
+
+    setBalanceSheet(balanceData);
+    
+    // Save to localStorage for customer pages - FIXED THIS PART
+    localStorage.setItem('ledger_sheet_data', JSON.stringify({
+      sheetId: extractedId,
+      balanceData: balanceData,
+      lastUpdated: new Date().toISOString()
+    }));
+    
+    const totalDR = balanceData
+      .filter(item => item.drCr === 'DR')
+      .reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    
+    const totalCR = balanceData
+      .filter(item => item.drCr === 'CR')
+      .reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    
+    setStats({
+      totalCustomers: balanceData.length,
+      totalDR,
+      totalCR,
+      netPosition: totalDR - totalCR
+    });
+
+    setLastUpdate(new Date());
+    setError('');
+    
+  } catch (err) {
+    console.error('Fetch error:', err);
+    setError('Failed to fetch data. Check sheet permissions and try again.');
+  }
+};
 
   const disconnect = () => {
     setConnected(false);
