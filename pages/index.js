@@ -57,16 +57,20 @@ const User = ({ className }) => (
   </svg>
 );
 
+// PRE-CONFIGURED GOOGLE SHEET ID - Replace with your actual sheet ID
+const DEFAULT_SHEET_ID = '1F1X-2FVVUKQUs4HSsGpgb1Qqk7-zieKtd_E29teQ7x0';
+
 export default function Home() {
   const [sheetId, setSheetId] = useState('');
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [balanceSheet, setBalanceSheet] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [viewMode, setViewMode] = useState('balance'); // 'balance' or 'customers'
+  const [viewMode, setViewMode] = useState('balance');
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalDR: 0,
@@ -75,10 +79,7 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const savedId = localStorage.getItem('ledger_sheet_id');
-    if (savedId) {
-      setSheetId(savedId);
-    }
+    initializeApp();
   }, []);
 
   useEffect(() => {
@@ -90,7 +91,37 @@ export default function Home() {
     }
   }, [connected, sheetId]);
 
+  const initializeApp = async () => {
+    try {
+      setInitializing(true);
+      
+      // Try to get saved sheet ID from localStorage
+      const savedId = localStorage.getItem('ledger_sheet_id');
+      
+      if (savedId) {
+        // Use saved sheet ID
+        setSheetId(savedId);
+        await fetchData(savedId);
+        setConnected(true);
+      } else if (DEFAULT_SHEET_ID && DEFAULT_SHEET_ID !== '1YOUR_DEFAULT_SHEET_ID_HERE') {
+        // Use default sheet ID if configured
+        setSheetId(DEFAULT_SHEET_ID);
+        localStorage.setItem('ledger_sheet_id', DEFAULT_SHEET_ID);
+        await fetchData(DEFAULT_SHEET_ID);
+        setConnected(true);
+      }
+      // If neither saved nor default ID exists, stay on connection page
+      
+    } catch (err) {
+      console.error('Initialization error:', err);
+      setError('Failed to connect to default sheet. Please check the connection.');
+    } finally {
+      setInitializing(false);
+    }
+  };
+
   const extractSheetId = (input) => {
+    if (!input) return '';
     const match = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     return match ? match[1] : input;
   };
@@ -106,7 +137,7 @@ export default function Home() {
         throw new Error('Invalid Google Sheets ID or URL');
       }
 
-      localStorage.setItem('ledger_sheet_data', JSON.stringify(balanceData));
+      localStorage.setItem('ledger_sheet_id', id);
       await fetchData(id);
       setConnected(true);
       
@@ -137,14 +168,17 @@ export default function Home() {
       
       const rows = balanceJson.table.rows.slice(2);
       const balanceData = rows.map((row, index) => ({
-  id: `customer-${index}-${Date.now()}`,
-  name: row.c[0]?.v || '',
-  balance: parseFloat(row.c[1]?.v || 0),
-  drCr: row.c[2]?.v || '',
-  link: row.c[3]?.v || ''
-})).filter(item => item.name);
+        id: `customer-${index}-${Date.now()}`,
+        name: row.c[0]?.v || '',
+        balance: parseFloat(row.c[1]?.v || 0),
+        drCr: row.c[2]?.v || '',
+        link: row.c[3]?.v || ''
+      })).filter(item => item.name);
 
       setBalanceSheet(balanceData);
+      
+      // Save to localStorage for customer pages
+      localStorage.setItem('ledger_sheet_data', JSON.stringify(balanceData));
       
       const totalDR = balanceData
         .filter(item => item.drCr === 'DR')
@@ -175,6 +209,13 @@ export default function Home() {
     setSheetId('');
     setBalanceSheet([]);
     localStorage.removeItem('ledger_sheet_id');
+    localStorage.removeItem('ledger_sheet_data');
+  };
+
+  const resetToDefault = () => {
+    localStorage.removeItem('ledger_sheet_id');
+    localStorage.removeItem('ledger_sheet_data');
+    window.location.reload();
   };
 
   const filteredData = balanceSheet.filter(item => {
@@ -194,6 +235,20 @@ export default function Home() {
       minimumFractionDigits: 2
     }).format(amount);
   };
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mb-4">
+            <RefreshCw className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Loading Ledger</h1>
+          <p className="text-gray-600">Connecting to your sheet...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!connected) {
     return (
@@ -296,11 +351,14 @@ export default function Home() {
                 <Camera className="w-8 h-8" />
                 <div>
                   <h1 className="text-2xl font-bold">Ledger Dashboard</h1>
-                  <p className="text-sm text-blue-100">Live from Google Sheets</p>
+                  <p className="text-sm text-blue-100">Connected to Shared Sheet</p>
                 </div>
               </div>
               
               <div className="flex items-center space-x-4">
+                <div className="text-sm text-blue-100 bg-white/20 px-3 py-1 rounded-lg">
+                  Sheet: {sheetId.substring(0, 8)}...
+                </div>
                 <button
                   onClick={() => fetchData()}
                   className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
@@ -310,10 +368,10 @@ export default function Home() {
                 </button>
                 
                 <button
-                  onClick={disconnect}
-                  className="flex items-center px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-sm"
+                  onClick={resetToDefault}
+                  className="flex items-center px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors text-sm"
                 >
-                  Disconnect
+                  Change Sheet
                 </button>
               </div>
             </div>
