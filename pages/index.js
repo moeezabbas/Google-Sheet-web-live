@@ -106,7 +106,7 @@ export default function Home() {
         throw new Error('Invalid Google Sheets ID or URL');
       }
 
-      localStorage.setItem('ledger_sheet_id', id);
+      localStorage.setItem('ledger_sheet_data', JSON.stringify(balanceData));
       await fetchData(id);
       setConnected(true);
       
@@ -136,13 +136,13 @@ export default function Home() {
       const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
       
       const rows = balanceJson.table.rows.slice(2);
-      const balanceData = rows.map(row => ({
-        id: row.c[0]?.v?.replace(/\s+/g, '-').toLowerCase() || Math.random().toString(36),
-        name: row.c[0]?.v || '',
-        balance: parseFloat(row.c[1]?.v || 0),
-        drCr: row.c[2]?.v || '',
-        link: row.c[3]?.v || ''
-      })).filter(item => item.name);
+      const balanceData = rows.map((row, index) => ({
+  id: `customer-${index}-${Date.now()}`,
+  name: row.c[0]?.v || '',
+  balance: parseFloat(row.c[1]?.v || 0),
+  drCr: row.c[2]?.v || '',
+  link: row.c[3]?.v || ''
+})).filter(item => item.name);
 
       setBalanceSheet(balanceData);
       
