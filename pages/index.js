@@ -1,6 +1,3 @@
-// ============================================
-// FILE 3: pages/index.js (MAIN APP CODE)
-// ============================================
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 
@@ -116,7 +113,7 @@ export default function Home() {
       );
       
       if (!balanceResponse.ok) {
-        throw new Error('Could not access sheet. Make sure it\'s publicly accessible.');
+        throw new Error('Could not access sheet. Make sure it is publicly accessible.');
       }
 
       const balanceText = await balanceResponse.text();
