@@ -42,22 +42,36 @@ export default function CustomerPage() {
 
   const loadCustomerData = () => {
     try {
-      // Get customer data from localStorage - FIXED DATA RETRIEVAL
+      console.log('Loading customer data for ID:', id); // Debug log
+      
+      // Get customer data from localStorage
       const savedData = localStorage.getItem('ledger_sheet_data');
+      console.log('Saved data found:', !!savedData); // Debug log
       
       if (savedData) {
         const parsedData = JSON.parse(savedData);
+        console.log('Parsed data structure:', parsedData); // Debug log
         
         // Check if data structure is correct
         if (parsedData && parsedData.balanceData && Array.isArray(parsedData.balanceData)) {
           const balanceData = parsedData.balanceData;
-          const foundCustomer = balanceData.find(item => item.id === id);
+          console.log('Total customers in data:', balanceData.length); // Debug log
+          
+          // Find customer by ID - improved search
+          const foundCustomer = balanceData.find(item => {
+            // Handle both full ID and partial matching for backward compatibility
+            return item.id === id || 
+                   item.id.includes(id) || 
+                   (item.name && item.name.replace(/\s+/g, '-').toLowerCase().includes(id));
+          });
+          
+          console.log('Found customer:', foundCustomer); // Debug log
           
           if (foundCustomer) {
             setCustomer(foundCustomer);
             generateMockTransactions(foundCustomer);
           } else {
-            console.error('Customer not found in balanceData');
+            console.error('Customer not found. Available IDs:', balanceData.map(item => item.id));
           }
         } else {
           console.error('Invalid data structure in localStorage');
@@ -74,29 +88,34 @@ export default function CustomerPage() {
 
   const generateMockTransactions = (customer) => {
     // Generate mock transaction history based on customer data
+    const baseAmount = Math.abs(customer.balance);
     const mockTransactions = [
       { 
+        id: 1,
         date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
         description: 'Opening Balance', 
-        amount: Math.abs(customer.balance), 
+        amount: baseAmount, 
         type: customer.drCr 
       },
       { 
+        id: 2,
         date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
         description: 'Monthly Transaction', 
-        amount: Math.abs(customer.balance) * 0.1, 
-        type: customer.drCr === 'DR' ? 'DR' : 'CR' 
+        amount: baseAmount * 0.1, 
+        type: customer.drCr 
       },
       { 
+        id: 3,
         date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
         description: 'Recent Activity', 
-        amount: Math.abs(customer.balance) * 0.05, 
-        type: customer.drCr === 'DR' ? 'CR' : 'DR' 
+        amount: baseAmount * 0.05, 
+        type: customer.drCr === 'DR' ? 'CR' : 'DR'
       },
       { 
+        id: 4,
         date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
         description: 'Latest Update', 
-        amount: Math.abs(customer.balance) * 0.02, 
+        amount: baseAmount * 0.02, 
         type: customer.drCr 
       }
     ];
@@ -108,7 +127,8 @@ export default function CustomerPage() {
     return new Intl.NumberFormat('en-PK', {
       style: 'currency',
       currency: 'PKR',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
   };
 
@@ -134,13 +154,14 @@ export default function CustomerPage() {
   if (!customer) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-lg shadow-md">
+        <div className="text-center bg-white p-8 rounded-lg shadow-md max-w-md w-full">
           <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Customer Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            The customer you're looking for doesn't exist or the data has been refreshed.
-            <br />
-            <span className="text-sm">Please go back to the dashboard and refresh the data.</span>
+          <p className="text-gray-600 mb-4">
+            The customer you're looking for doesn't exist in the current data.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            This might happen if the data was refreshed. Please go back to the dashboard and try again.
           </p>
           <Link 
             href="/" 
@@ -173,7 +194,7 @@ export default function CustomerPage() {
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </Link>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h1 className="text-2xl font-bold truncate">{customer.name}</h1>
                   <p className="text-sm text-blue-100">Customer Details</p>
                 </div>
@@ -185,7 +206,7 @@ export default function CustomerPage() {
                     href={customer.link} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
+                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm whitespace-nowrap"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Open Sheet
@@ -227,8 +248,8 @@ export default function CustomerPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Last Updated:</span>
-                  <span className="text-sm text-gray-700">{new Date().toLocaleDateString()}</span>
+                  <span className="text-gray-600">Customer ID:</span>
+                  <span className="text-sm text-gray-700 font-mono">{customer.id.substring(0, 8)}...</span>
                 </div>
               </div>
             </div>
@@ -263,13 +284,13 @@ export default function CustomerPage() {
                 Recent Activity
               </h3>
               <div className="space-y-3">
-                {transactions.slice(0, 2).map((transaction, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-800 text-sm">{transaction.description}</p>
+                {transactions.slice(0, 2).map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-800 text-sm truncate">{transaction.description}</p>
                       <p className="text-xs text-gray-500">{formatDate(transaction.date)}</p>
                     </div>
-                    <span className={`font-semibold text-sm ${
+                    <span className={`font-semibold text-sm whitespace-nowrap ml-2 ${
                       transaction.type === 'DR' ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {formatCurrency(transaction.amount)}
@@ -305,11 +326,11 @@ export default function CustomerPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {transactions.map((transaction, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  {transactions.map((transaction) => (
+                    <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <Calendar className="w-4 h-4 text-gray-400 mr-2" />
+                          <Calendar className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
                           <span className="text-sm text-gray-700">{formatDate(transaction.date)}</span>
                         </div>
                       </td>
