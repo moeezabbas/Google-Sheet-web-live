@@ -58,7 +58,7 @@ const User = ({ className }) => (
 );
 
 // PRE-CONFIGURED GOOGLE SHEET ID
-const DEFAULT_SHEET_ID = '1YOUR_DEFAULT_SHEET_ID_HERE';
+const DEFAULT_SHEET_ID = '1F1X-2FVVUKQUs4HSsGpgb1Qqk7-zieKtd_E29teQ7x0';
 
 export default function Home() {
   const [sheetId, setSheetId] = useState('');
