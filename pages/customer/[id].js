@@ -201,17 +201,21 @@ export default function CustomerPage() {
               </div>
               
               <div className="flex space-x-2">
-                {customer.link && (
-                  <a 
-                    href={customer.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm whitespace-nowrap"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Sheet
-                  </a>
-                )}
+                {customer.link && customer.link.startsWith('http') && (
+  <a 
+    href={customer.link} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm whitespace-nowrap"
+    onClick={(e) => {
+      e.preventDefault();
+      window.open(customer.link, '_blank', 'noopener,noreferrer');
+    }}
+  >
+    <ExternalLink className="w-4 h-4 mr-2" />
+    Open Sheet
+  </a>
+)}
               </div>
             </div>
           </div>
