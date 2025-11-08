@@ -146,150 +146,192 @@ export default function Home() {
     }
   };
 
-  const fetchData = async (id = sheetId) => {
-    if (!id) return;
+ const fetchData = async (id = sheetId) => {
+  if (!id) return;
+  
+  try {
+    const extractedId = extractSheetId(id);
     
-    try {
-      const extractedId = extractSheetId(id);
-      
-      const balanceResponse = await fetch(
-        `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet&t=${Date.now()}`
-      );
-      
-      if (!balanceResponse.ok) {
-        throw new Error('Could not access sheet. Make sure it is publicly accessible.');
-      }
-
-      const balanceText = await balanceResponse.text();
-      const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
-      
-      const rows = balanceJson.table.rows || [];
-      console.log('🔍 Total rows from sheet:', rows.length);
-
-      const balanceData = [];
-      let skippedRows = [];
-
-      // Start from row 3 (index 2) - this should be the first customer
-      for (let i = 2; i < rows.length; i++) {
-        const row = rows[i];
-        
-        if (row && row.c) {
-          const nameCell = row.c[0];
-          const balanceCell = row.c[1];
-          const drCrCell = row.c[2];
-          const linkCell = row.c[3];
-          
-          // Get raw values
-          const rawName = nameCell ? (nameCell.v || nameCell.f || '') : '';
-          const rawBalance = balanceCell ? (balanceCell.v || balanceCell.f || '0') : '0';
-          const rawDrCr = drCrCell ? (drCrCell.v || drCrCell.f || '') : '';
-          const rawLink = linkCell ? (linkCell.v || linkCell.f || '') : '';
-
-          // Clean and process data
-          const cleanName = String(rawName).trim();
-          
-          // VERY PERMISSIVE FILTERING - Only skip completely empty rows
-          if (!cleanName || cleanName === '') {
-            skippedRows.push(`Row ${i+1}: Empty name`);
-            continue;
-          }
-
-          // Skip only obvious header/total rows (be very specific)
-          if (cleanName === 'Customer Name' || 
-              cleanName === 'Total' ||
-              cleanName === 'Count:' ||
-              cleanName.toLowerCase() === 'count: 79') {
-            skippedRows.push(`Row ${i+1}: Header/Total row - "${cleanName}"`);
-            continue;
-          }
-
-          // Parse balance - handle currency format
-          let cleanBalance = 0;
-          if (typeof rawBalance === 'number') {
-            cleanBalance = rawBalance;
-          } else {
-            const balanceText = String(rawBalance).replace(/[Rs.,\s]/g, '');
-            cleanBalance = parseFloat(balanceText) || 0;
-          }
-
-          // Parse DR/CR - handle various formats
-          let cleanDrCr = String(rawDrCr).trim().toUpperCase();
-          if (cleanDrCr === 'NIII' || cleanDrCr === 'NILL' || cleanDrCr === 'NIL' || cleanDrCr === '') {
-            cleanDrCr = 'NILL';
-          } else if (cleanDrCr !== 'DR' && cleanDrCr !== 'CR') {
-            cleanDrCr = 'NILL'; // Default to NILL for unknown values
-          }
-
-          balanceData.push({
-            id: `customer-${i}-${cleanName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
-            name: cleanName,
-            balance: cleanBalance,
-            drCr: cleanDrCr,
-            link: String(rawLink).trim(),
-            rowNumber: i + 1 // Add row number for debugging
-          });
-        } else {
-          skippedRows.push(`Row ${i+1}: No cells data`);
-        }
-      }
-
-      console.log(`✅ Parsed ${balanceData.length} customers, skipped ${skippedRows.length} rows`);
-      console.log('📊 All parsed customers:', balanceData.map(c => ({ name: c.name, row: c.rowNumber })));
-      console.log('❌ Skipped rows:', skippedRows);
-
-      // Debug: Check if we have exactly 79 customers
-      if (balanceData.length !== 79) {
-        console.warn(`⚠️ Expected 79 customers but got ${balanceData.length}. Checking row data...`);
-        
-        // Log first few rows to see what's happening
-        for (let i = 0; i < Math.min(5, rows.length); i++) {
-          const row = rows[i];
-          console.log(`Row ${i} (${i < 2 ? 'HEADER?' : 'CUSTOMER?'}):`, {
-            hasCells: !!row.c,
-            name: row.c && row.c[0] ? (row.c[0].v || row.c[0].f) : 'NO NAME',
-            balance: row.c && row.c[1] ? (row.c[1].v || row.c[1].f) : 'NO BALANCE',
-            drCr: row.c && row.c[2] ? (row.c[2].v || row.c[2].f) : 'NO DR/CR'
-          });
-        }
-      }
-
-      setBalanceSheet(balanceData);
-      
-      // Save complete data for customer pages
-      localStorage.setItem('ledger_sheet_data', JSON.stringify({
-        sheetId: extractedId,
-        balanceData: balanceData,
-        lastUpdated: new Date().toISOString(),
-        totalCount: balanceData.length,
-        skippedRows: skippedRows // Save skipped rows for debugging
-      }));
-      
-      // Calculate statistics
-      const drCustomers = balanceData.filter(item => item.drCr === 'DR');
-      const crCustomers = balanceData.filter(item => item.drCr === 'CR');
-      const nillCustomers = balanceData.filter(item => item.drCr === 'NILL');
-      
-      const totalDR = drCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
-      const totalCR = crCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
-      
-      console.log(`📈 Stats: DR=${drCustomers.length}, CR=${crCustomers.length}, NILL=${nillCustomers.length}`);
-      console.log(`💰 Totals: DR=Rs.${totalDR}, CR=Rs.${totalCR}`);
-
-      setStats({
-        totalCustomers: balanceData.length,
-        totalDR,
-        totalCR,
-        netPosition: totalDR - totalCR
-      });
-
-      setLastUpdate(new Date());
-      setError('');
-      
-    } catch (err) {
-      console.error('❌ Fetch error:', err);
-      setError('Failed to fetch data. Check sheet permissions and try again.');
+    const balanceResponse = await fetch(
+      `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet&t=${Date.now()}`
+    );
+    
+    if (!balanceResponse.ok) {
+      throw new Error('Could not access sheet. Make sure it is publicly accessible.');
     }
-  };
+
+    const balanceText = await balanceResponse.text();
+    const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
+    
+    const rows = balanceJson.table.rows || [];
+    console.log('🔍 Total rows from sheet:', rows.length);
+
+    const balanceData = [];
+    let skippedRows = [];
+
+    // DEBUG: Log first 10 rows to see the structure
+    console.log('📋 First 10 rows structure:');
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const row = rows[i];
+      console.log(`Row ${i}:`, {
+        hasCells: !!row.c,
+        cellCount: row.c ? row.c.length : 0,
+        name: row.c && row.c[0] ? (row.c[0].v || row.c[0].f || 'EMPTY') : 'NO CELLS',
+        balance: row.c && row.c[1] ? (row.c[1].v || row.c[1].f || 'EMPTY') : 'NO BALANCE',
+        drCr: row.c && row.c[2] ? (row.c[2].v || row.c[2].f || 'EMPTY') : 'NO DR/CR'
+      });
+    }
+
+    // Find the actual starting row with customer data
+    let startRow = 0;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const row = rows[i];
+      if (row && row.c && row.c[0]) {
+        const name = String(row.c[0].v || row.c[0].f || '').trim();
+        // Look for the first row that has a real customer name (not header)
+        if (name && 
+            name !== 'Customer Name' && 
+            !name.toLowerCase().includes('total') &&
+            name !== 'Count:' &&
+            name.length > 1) {
+          startRow = i;
+          console.log(`🎯 Found first customer at row ${startRow}: "${name}"`);
+          break;
+        }
+      }
+    }
+
+    console.log(`🚀 Starting data extraction from row ${startRow}`);
+
+    // Parse ALL rows starting from the identified start row
+    for (let i = startRow; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (row && row.c) {
+        const nameCell = row.c[0];
+        const balanceCell = row.c[1];
+        const drCrCell = row.c[2];
+        const linkCell = row.c[3];
+        
+        // Get raw values
+        const rawName = nameCell ? (nameCell.v || nameCell.f || '') : '';
+        const rawBalance = balanceCell ? (balanceCell.v || balanceCell.f || '0') : '0';
+        const rawDrCr = drCrCell ? (drCrCell.v || drCrCell.f || '') : '';
+        const rawLink = linkCell ? (linkCell.v || linkCell.f || '') : '';
+
+        // Clean and process data
+        const cleanName = String(rawName).trim();
+        
+        // VERY PERMISSIVE FILTERING - Only skip completely empty or obvious non-customer rows
+        if (!cleanName || cleanName === '') {
+          skippedRows.push(`Row ${i+1}: Empty name`);
+          continue;
+        }
+
+        // Skip only obvious header/total rows (be very specific)
+        if (cleanName === 'Customer Name' || 
+            cleanName === 'Total' ||
+            cleanName === 'Count:' ||
+            cleanName.toLowerCase().includes('count:') ||
+            cleanName.toLowerCase().includes('total ')) {
+          skippedRows.push(`Row ${i+1}: Header/Total row - "${cleanName}"`);
+          continue;
+        }
+
+        // Parse balance - handle currency format
+        let cleanBalance = 0;
+        if (typeof rawBalance === 'number') {
+          cleanBalance = rawBalance;
+        } else {
+          const balanceText = String(rawBalance).replace(/[Rs.,\s]/g, '');
+          cleanBalance = parseFloat(balanceText) || 0;
+        }
+
+        // Parse DR/CR - handle various formats
+        let cleanDrCr = String(rawDrCr).trim().toUpperCase();
+        if (cleanDrCr === 'NIII' || cleanDrCr === 'NILL' || cleanDrCr === 'NIL' || cleanDrCr === '') {
+          cleanDrCr = 'NILL';
+        } else if (cleanDrCr !== 'DR' && cleanDrCr !== 'CR') {
+          cleanDrCr = 'NILL'; // Default to NILL for unknown values
+        }
+
+        balanceData.push({
+          id: `customer-${i}-${cleanName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+          name: cleanName,
+          balance: cleanBalance,
+          drCr: cleanDrCr,
+          link: String(rawLink).trim(),
+          rowNumber: i + 1 // Add row number for debugging
+        });
+      } else {
+        skippedRows.push(`Row ${i+1}: No cells data`);
+      }
+    }
+
+    console.log(`✅ Parsed ${balanceData.length} customers, skipped ${skippedRows.length} rows`);
+    console.log('📊 First 5 customers:', balanceData.slice(0, 5).map(c => ({ name: c.name, row: c.rowNumber, balance: c.balance, drCr: c.drCr })));
+    console.log('📊 Last 5 customers:', balanceData.slice(-5).map(c => ({ name: c.name, row: c.rowNumber, balance: c.balance, drCr: c.drCr })));
+    console.log('❌ Skipped rows:', skippedRows);
+
+    // Debug: Check if we have exactly 79 customers
+    if (balanceData.length !== 79) {
+      console.warn(`⚠️ Expected 79 customers but got ${balanceData.length}.`);
+      console.log('🔍 Checking specific rows that might be missed:');
+      
+      // Check rows around the expected range
+      for (let i = Math.max(0, startRow - 2); i < Math.min(rows.length, startRow + 85); i++) {
+        const row = rows[i];
+        if (row && row.c && row.c[0]) {
+          const name = String(row.c[0].v || row.c[0].f || '').trim();
+          const isIncluded = balanceData.some(customer => customer.rowNumber === i + 1);
+          if (name && !isIncluded) {
+            console.log(`❓ Row ${i+1} NOT included but has name: "${name}"`, {
+              balance: row.c[1] ? (row.c[1].v || row.c[1].f) : 'NO BALANCE',
+              drCr: row.c[2] ? (row.c[2].v || row.c[2].f) : 'NO DR/CR'
+            });
+          }
+        }
+      }
+    }
+
+    setBalanceSheet(balanceData);
+    
+    // Save complete data for customer pages
+    localStorage.setItem('ledger_sheet_data', JSON.stringify({
+      sheetId: extractedId,
+      balanceData: balanceData,
+      lastUpdated: new Date().toISOString(),
+      totalCount: balanceData.length,
+      skippedRows: skippedRows,
+      startRow: startRow + 1
+    }));
+    
+    // Calculate statistics
+    const drCustomers = balanceData.filter(item => item.drCr === 'DR');
+    const crCustomers = balanceData.filter(item => item.drCr === 'CR');
+    const nillCustomers = balanceData.filter(item => item.drCr === 'NILL');
+    
+    const totalDR = drCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    const totalCR = crCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    
+    console.log(`📈 Stats: DR=${drCustomers.length}, CR=${crCustomers.length}, NILL=${nillCustomers.length}`);
+    console.log(`💰 Totals: DR=Rs.${totalDR}, CR=Rs.${totalCR}`);
+
+    setStats({
+      totalCustomers: balanceData.length,
+      totalDR,
+      totalCR,
+      netPosition: totalDR - totalCR
+    });
+
+    setLastUpdate(new Date());
+    setError('');
+    
+  } catch (err) {
+    console.error('❌ Fetch error:', err);
+    setError('Failed to fetch data. Check sheet permissions and try again.');
+  }
+};
 
   const disconnect = () => {
     setConnected(false);
@@ -482,25 +524,25 @@ export default function Home() {
 
         <div className="container mx-auto px-4 py-6">
           {/* Debug Info - Remove in production */}
-          <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 text-sm">
-            <strong>Debug Info:</strong> Sheet has {balanceSheet.length > 0 ? '79' : '?'} rows → Parsed {stats.totalCustomers} customers | 
-            {stats.totalCustomers !== 79 && <span className="text-red-600 font-bold"> MISSING {79 - stats.totalCustomers} CUSTOMERS!</span>}
-            Auto-refresh: {autoRefresh ? 'ON' : 'OFF'} | 
-            Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}
-            <button 
-              onClick={() => {
-                const savedData = localStorage.getItem('ledger_sheet_data');
-                if (savedData) {
-                  const data = JSON.parse(savedData);
-                  console.log('🔍 Full debug data:', data);
-                  alert(`Check console for full debug info.\nParsed: ${data.balanceData.length} customers\nSkipped: ${data.skippedRows ? data.skippedRows.length : 0} rows`);
-                }
-              }}
-              className="ml-2 px-2 py-1 bg-yellow-500 text-white text-xs rounded"
-            >
-              Debug Details
-            </button>
-          </div>
+<div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 text-sm">
+  <strong>Debug Info:</strong> Sheet rows: {balanceSheet.length > 0 ? '79' : '?'} → Parsed: {stats.totalCustomers} customers | 
+  {stats.totalCustomers !== 79 && <span className="text-red-600 font-bold"> MISSING {79 - stats.totalCustomers} CUSTOMERS!</span>}
+  Auto-refresh: {autoRefresh ? 'ON' : 'OFF'} | 
+  Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}
+  <button 
+    onClick={() => {
+      const savedData = localStorage.getItem('ledger_sheet_data');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        console.log('🔍 Full debug data:', data);
+        alert(`Check console for full debug info.\nParsed: ${data.balanceData.length} customers\nStart Row: ${data.startRow || 'Unknown'}\nSkipped: ${data.skippedRows ? data.skippedRows.length : 0} rows`);
+      }
+    }}
+    className="ml-2 px-2 py-1 bg-yellow-500 text-white text-xs rounded"
+  >
+    Debug Details
+  </button>
+</div>
 
           {/* View Mode Toggle */}
           <div className="flex gap-2 mb-6">
