@@ -166,24 +166,44 @@ export default function Home() {
     const balanceText = await balanceResponse.text();
     const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
     
-    const rows = balanceJson.table.rows.slice(2);
-    const balanceData = rows.map((row, index) => ({
-      id: `customer-${index}-${Date.now()}`,
-      name: row.c[0]?.v || '',
-      balance: parseFloat(row.c[1]?.v || 0),
-      drCr: row.c[2]?.v || '',
-      link: row.c[3]?.v || ''
-    })).filter(item => item.name);
+    // Improved data parsing - handle empty rows and different data structures
+    const rows = balanceJson.table.rows || [];
+    const balanceData = rows
+      .slice(2) // Skip header rows
+      .map((row, index) => {
+        // Safely access cell data
+        const name = row.c && row.c[0] ? (row.c[0].v || '') : '';
+        const balance = row.c && row.c[1] ? parseFloat(row.c[1].v || 0) : 0;
+        const drCr = row.c && row.c[2] ? (row.c[2].v || '') : '';
+        const link = row.c && row.c[3] ? (row.c[3].v || '') : '';
+        
+        // Only include rows with customer names
+        if (name && name.trim() !== '') {
+          return {
+            id: `customer-${index}-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+            name: name.trim(),
+            balance: balance,
+            drCr: drCr.trim().toUpperCase() || 'Nill',
+            link: link
+          };
+        }
+        return null;
+      })
+      .filter(item => item !== null); // Remove null entries
+
+    console.log('Parsed data:', balanceData); // Debug log
 
     setBalanceSheet(balanceData);
     
-    // Save to localStorage for customer pages - FIXED THIS PART
+    // Save to localStorage for customer pages
     localStorage.setItem('ledger_sheet_data', JSON.stringify({
       sheetId: extractedId,
       balanceData: balanceData,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      totalCount: balanceData.length
     }));
     
+    // Calculate statistics
     const totalDR = balanceData
       .filter(item => item.drCr === 'DR')
       .reduce((sum, item) => sum + Math.abs(item.balance), 0);
