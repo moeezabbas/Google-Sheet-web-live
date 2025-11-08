@@ -21,6 +21,12 @@ const Calendar = ({ className }) => (
   </svg>
 );
 
+const User = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
 export default function CustomerPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -30,23 +36,44 @@ export default function CustomerPage() {
 
   useEffect(() => {
     if (id) {
-      // In a real app, you would fetch customer-specific data here
-      // For now, we'll simulate with mock data
+      // Get customer data from localStorage
       const savedData = localStorage.getItem('ledger_sheet_data');
       if (savedData) {
         const balanceSheet = JSON.parse(savedData);
-        const foundCustomer = balanceSheet.find(item => 
-          item.id === id || item.name.replace(/\s+/g, '-').toLowerCase() === id
-        );
-        setCustomer(foundCustomer || null);
+        const foundCustomer = balanceSheet.find(item => item.id === id);
         
-        // Mock transactions data
         if (foundCustomer) {
-          setTransactions([
-            { date: '2024-01-15', description: 'Initial Balance', amount: foundCustomer.balance, type: foundCustomer.drCr },
-            { date: '2024-01-20', description: 'Payment Received', amount: 5000, type: 'CR' },
-            { date: '2024-01-25', description: 'Goods Sold', amount: 15000, type: 'DR' },
-          ]);
+          setCustomer(foundCustomer);
+          
+          // Generate mock transaction history based on customer data
+          const mockTransactions = [
+            { 
+              date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+              description: 'Opening Balance', 
+              amount: Math.abs(foundCustomer.balance), 
+              type: foundCustomer.drCr 
+            },
+            { 
+              date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+              description: 'Monthly Transaction', 
+              amount: Math.abs(foundCustomer.balance) * 0.1, 
+              type: foundCustomer.drCr === 'DR' ? 'DR' : 'CR' 
+            },
+            { 
+              date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+              description: 'Recent Activity', 
+              amount: Math.abs(foundCustomer.balance) * 0.05, 
+              type: foundCustomer.drCr === 'DR' ? 'CR' : 'DR' 
+            },
+            { 
+              date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+              description: 'Latest Update', 
+              amount: Math.abs(foundCustomer.balance) * 0.02, 
+              type: foundCustomer.drCr 
+            }
+          ];
+          
+          setTransactions(mockTransactions);
         }
       }
       setLoading(false);
@@ -62,7 +89,11 @@ export default function CustomerPage() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-PK');
+    return new Date(dateString).toLocaleDateString('en-PK', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   if (loading) {
@@ -79,10 +110,16 @@ export default function CustomerPage() {
   if (!customer) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center bg-white p-8 rounded-lg shadow-md">
+          <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Customer Not Found</h1>
-          <Link href="/" className="text-blue-500 hover:text-blue-600">
-            ← Back to Dashboard
+          <p className="text-gray-600 mb-6">The customer you're looking for doesn't exist or the data has been refreshed.</p>
+          <Link 
+            href="/" 
+            className="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
           </Link>
         </div>
       </div>
@@ -100,42 +137,48 @@ export default function CustomerPage() {
         {/* Header */}
         <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center space-x-4">
                 <Link 
                   href="/"
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </Link>
                 <div>
-                  <h1 className="text-2xl font-bold">{customer.name}</h1>
+                  <h1 className="text-2xl font-bold truncate">{customer.name}</h1>
                   <p className="text-sm text-blue-100">Customer Details</p>
                 </div>
               </div>
               
-              {customer.link && (
-                <a 
-                  href={customer.link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Sheet
-                </a>
-              )}
+              <div className="flex space-x-2">
+                {customer.link && (
+                  <a 
+                    href={customer.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Sheet
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </header>
 
         <div className="container mx-auto px-4 py-6">
-          {/* Customer Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Customer Summary Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Account Summary */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Summary</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <User className="w-5 h-5 mr-2 text-blue-500" />
+                Account Summary
+              </h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                   <span className="text-gray-600">Current Balance:</span>
                   <span className={`text-xl font-bold ${
                     customer.drCr === 'DR' ? 'text-red-600' : 'text-green-600'
@@ -143,8 +186,8 @@ export default function CustomerPage() {
                     {formatCurrency(Math.abs(customer.balance))}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Status:</span>
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                  <span className="text-gray-600">Account Status:</span>
                   <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
                     customer.drCr === 'DR' 
                       ? 'bg-red-100 text-red-700' 
@@ -156,25 +199,49 @@ export default function CustomerPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Customer Since:</span>
-                  <span className="text-sm text-gray-700">Jan 2024</span>
+                  <span className="text-gray-600">Last Updated:</span>
+                  <span className="text-sm text-gray-700">{new Date().toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6 md:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h3>
+            {/* Quick Stats */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Stats</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                  <span className="text-gray-600">Total Transactions:</span>
+                  <span className="font-semibold text-gray-800">{transactions.length}</span>
+                </div>
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                  <span className="text-gray-600">Average Amount:</span>
+                  <span className="font-semibold text-gray-800">
+                    {formatCurrency(
+                      transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0) / transactions.length || 0
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Activity Period:</span>
+                  <span className="text-sm text-gray-700">30 days</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-green-500" />
+                Recent Activity
+              </h3>
               <div className="space-y-3">
-                {transactions.slice(0, 3).map((transaction, index) => (
+                {transactions.slice(0, 2).map((transaction, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-800">{transaction.description}</p>
-                        <p className="text-xs text-gray-500">{formatDate(transaction.date)}</p>
-                      </div>
+                    <div>
+                      <p className="font-medium text-gray-800 text-sm">{transaction.description}</p>
+                      <p className="text-xs text-gray-500">{formatDate(transaction.date)}</p>
                     </div>
-                    <span className={`font-semibold ${
+                    <span className={`font-semibold text-sm ${
                       transaction.type === 'DR' ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {formatCurrency(transaction.amount)}
@@ -186,7 +253,7 @@ export default function CustomerPage() {
           </div>
 
           {/* Transaction History */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
             <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
               <h2 className="text-xl font-bold">Transaction History</h2>
             </div>
@@ -213,7 +280,10 @@ export default function CustomerPage() {
                   {transactions.map((transaction, index) => (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatDate(transaction.date)}</span>
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 text-gray-400 mr-2" />
+                          <span className="text-sm text-gray-700">{formatDate(transaction.date)}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-medium text-gray-800 text-sm">{transaction.description}</span>
@@ -242,10 +312,10 @@ export default function CustomerPage() {
           </div>
 
           {/* Back Button */}
-          <div className="mt-6">
+          <div className="flex justify-center">
             <Link 
               href="/"
-              className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-md"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
