@@ -36,49 +36,73 @@ export default function CustomerPage() {
 
   useEffect(() => {
     if (id) {
-      // Get customer data from localStorage
-      const savedData = localStorage.getItem('ledger_sheet_data');
-      if (savedData) {
-        const balanceSheet = JSON.parse(savedData);
-        const foundCustomer = balanceSheet.find(item => item.id === id);
-        
-        if (foundCustomer) {
-          setCustomer(foundCustomer);
-          
-          // Generate mock transaction history based on customer data
-          const mockTransactions = [
-            { 
-              date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-              description: 'Opening Balance', 
-              amount: Math.abs(foundCustomer.balance), 
-              type: foundCustomer.drCr 
-            },
-            { 
-              date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-              description: 'Monthly Transaction', 
-              amount: Math.abs(foundCustomer.balance) * 0.1, 
-              type: foundCustomer.drCr === 'DR' ? 'DR' : 'CR' 
-            },
-            { 
-              date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-              description: 'Recent Activity', 
-              amount: Math.abs(foundCustomer.balance) * 0.05, 
-              type: foundCustomer.drCr === 'DR' ? 'CR' : 'DR' 
-            },
-            { 
-              date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-              description: 'Latest Update', 
-              amount: Math.abs(foundCustomer.balance) * 0.02, 
-              type: foundCustomer.drCr 
-            }
-          ];
-          
-          setTransactions(mockTransactions);
-        }
-      }
-      setLoading(false);
+      loadCustomerData();
     }
   }, [id]);
+
+  const loadCustomerData = () => {
+    try {
+      // Get customer data from localStorage - FIXED DATA RETRIEVAL
+      const savedData = localStorage.getItem('ledger_sheet_data');
+      
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        
+        // Check if data structure is correct
+        if (parsedData && parsedData.balanceData && Array.isArray(parsedData.balanceData)) {
+          const balanceData = parsedData.balanceData;
+          const foundCustomer = balanceData.find(item => item.id === id);
+          
+          if (foundCustomer) {
+            setCustomer(foundCustomer);
+            generateMockTransactions(foundCustomer);
+          } else {
+            console.error('Customer not found in balanceData');
+          }
+        } else {
+          console.error('Invalid data structure in localStorage');
+        }
+      } else {
+        console.error('No data found in localStorage');
+      }
+    } catch (error) {
+      console.error('Error loading customer data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateMockTransactions = (customer) => {
+    // Generate mock transaction history based on customer data
+    const mockTransactions = [
+      { 
+        date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        description: 'Opening Balance', 
+        amount: Math.abs(customer.balance), 
+        type: customer.drCr 
+      },
+      { 
+        date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        description: 'Monthly Transaction', 
+        amount: Math.abs(customer.balance) * 0.1, 
+        type: customer.drCr === 'DR' ? 'DR' : 'CR' 
+      },
+      { 
+        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        description: 'Recent Activity', 
+        amount: Math.abs(customer.balance) * 0.05, 
+        type: customer.drCr === 'DR' ? 'CR' : 'DR' 
+      },
+      { 
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        description: 'Latest Update', 
+        amount: Math.abs(customer.balance) * 0.02, 
+        type: customer.drCr 
+      }
+    ];
+    
+    setTransactions(mockTransactions);
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PK', {
@@ -113,7 +137,11 @@ export default function CustomerPage() {
         <div className="text-center bg-white p-8 rounded-lg shadow-md">
           <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Customer Not Found</h1>
-          <p className="text-gray-600 mb-6">The customer you're looking for doesn't exist or the data has been refreshed.</p>
+          <p className="text-gray-600 mb-6">
+            The customer you're looking for doesn't exist or the data has been refreshed.
+            <br />
+            <span className="text-sm">Please go back to the dashboard and refresh the data.</span>
+          </p>
           <Link 
             href="/" 
             className="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
