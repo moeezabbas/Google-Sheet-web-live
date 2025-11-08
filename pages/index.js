@@ -214,7 +214,24 @@ export default function Home() {
     console.log('Sample customers:', balanceData.slice(0, 5)); // Debug log
 
     setBalanceSheet(balanceData);
-    
+    const debugSheetStructure = (balanceJson) => {
+  console.log('=== SHEET STRUCTURE DEBUG ===');
+  const rows = balanceJson.table.rows || [];
+  
+  rows.forEach((row, index) => {
+    console.log(`Row ${index}:`, {
+      hasCells: !!row.c,
+      cellCount: row.c ? row.c.length : 0,
+      cells: row.c ? row.c.map(cell => ({
+        value: cell?.v,
+        formatted: cell?.f,
+        type: typeof cell?.v
+      })) : 'No cells'
+    });
+  });
+  
+  console.log('=== END DEBUG ===');
+};
     // Save to localStorage for customer pages
     localStorage.setItem('ledger_sheet_data', JSON.stringify({
       sheetId: extractedId,
@@ -451,7 +468,22 @@ export default function Home() {
               Customer View
             </button>
           </div>
-
+{/* Debug Button - Remove after testing */}
+<div className="mb-4">
+  <button
+    onClick={() => {
+      const savedData = localStorage.getItem('ledger_sheet_data');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        console.log('Current stored data:', data);
+        alert(`Stored customers: ${data.balanceData.length}\nCheck console for details.`);
+      }
+    }}
+    className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm"
+  >
+    Debug Data
+  </button>
+</div>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -601,17 +633,22 @@ export default function Home() {
                               <User className="w-3 h-3 mr-1" />
                               View
                             </Link>
-                            {customer.link && (
-                              <a 
-                                href={customer.link} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors"
-                              >
-                                <ExternalLink className="w-3 h-3 mr-1" />
-                                Sheet
-                              </a>
-                            )}
+                            {customer.link && customer.link.startsWith('http') && (
+  <a 
+    href={customer.link} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="inline-flex items-center px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors"
+    onClick={(e) => {
+      e.stopPropagation();
+      // Force link to open
+      window.open(customer.link, '_blank', 'noopener,noreferrer');
+    }}
+  >
+    <ExternalLink className="w-3 h-3 mr-1" />
+    Sheet
+  </a>
+)}
                           </div>
                         </td>
                       </tr>
