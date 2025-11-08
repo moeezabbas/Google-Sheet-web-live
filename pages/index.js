@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 
 const Camera = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,6 +45,18 @@ const Search = ({ className }) => (
   </svg>
 );
 
+const ExternalLink = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+);
+
+const User = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
 export default function Home() {
   const [sheetId, setSheetId] = useState('');
   const [connected, setConnected] = useState(false);
@@ -53,6 +66,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [viewMode, setViewMode] = useState('balance'); // 'balance' or 'customers'
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalDR: 0,
@@ -123,6 +137,7 @@ export default function Home() {
       
       const rows = balanceJson.table.rows.slice(2);
       const balanceData = rows.map(row => ({
+        id: row.c[0]?.v?.replace(/\s+/g, '-').toLowerCase() || Math.random().toString(36),
         name: row.c[0]?.v || '',
         balance: parseFloat(row.c[1]?.v || 0),
         drCr: row.c[2]?.v || '',
@@ -306,6 +321,33 @@ export default function Home() {
         </header>
 
         <div className="container mx-auto px-4 py-6">
+          {/* View Mode Toggle */}
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setViewMode('balance')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                viewMode === 'balance' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              Balance Sheet
+            </button>
+            <button
+              onClick={() => setViewMode('customers')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                viewMode === 'customers' 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Customer View
+            </button>
+          </div>
+
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
@@ -350,6 +392,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Search and Filter */}
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
@@ -358,7 +401,7 @@ export default function Home() {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search customers..."
+                  placeholder={`Search ${viewMode === 'balance' ? 'customers' : 'by name'}...`}
                   className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 />
               </div>
@@ -392,44 +435,113 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex flex-col sm:flex-row items-center justify-between gap-2">
-              <h2 className="text-xl font-bold">Balance Sheet</h2>
-              {lastUpdate && (
-                <p className="text-sm text-blue-100">
-                  Last updated: {lastUpdate.toLocaleTimeString()}
-                </p>
-              )}
-            </div>
+          {/* Balance Sheet View */}
+          {viewMode === 'balance' && (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex flex-col sm:flex-row items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">Balance Sheet</h2>
+                {lastUpdate && (
+                  <p className="text-sm text-blue-100">
+                    Last updated: {lastUpdate.toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Customer Name
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Balance (PKR)
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      DR/CR
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b-2 border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Customer Name
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Balance (PKR)
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        DR/CR
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredData.map((customer, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-900 text-sm">{customer.name}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {formatCurrency(Math.abs(customer.balance))}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                            customer.drCr === 'DR' 
+                              ? 'bg-red-100 text-red-700' 
+                              : customer.drCr === 'CR'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {customer.drCr}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center space-x-2">
+                            <Link 
+                              href={`/customer/${customer.id}`}
+                              className="inline-flex items-center px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors"
+                            >
+                              <User className="w-3 h-3 mr-1" />
+                              View
+                            </Link>
+                            {customer.link && (
+                              <a 
+                                href={customer.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Sheet
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {filteredData.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">No customers found.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Customer Cards View */}
+          {viewMode === 'customers' && (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white flex flex-col sm:flex-row items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">Customer Directory</h2>
+                <p className="text-sm text-green-100">
+                  {filteredData.length} customers found
+                </p>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredData.map((customer, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900 text-sm">{customer.name}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {formatCurrency(Math.abs(customer.balance))}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                    <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-semibold text-gray-800 text-lg truncate">
+                          {customer.name}
+                        </h3>
+                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold ${
                           customer.drCr === 'DR' 
                             ? 'bg-red-100 text-red-700' 
                             : customer.drCr === 'CR'
@@ -438,23 +550,58 @@ export default function Home() {
                         }`}>
                           {customer.drCr}
                         </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Balance:</span>
+                          <span className={`font-semibold ${
+                            customer.drCr === 'DR' ? 'text-red-600' : 'text-green-600'
+                          }`}>
+                            {formatCurrency(Math.abs(customer.balance))}
+                          </span>
+                        </div>
+                      </div>
 
-              {filteredData.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No customers found.</p>
+                      <div className="flex space-x-2">
+                        <Link 
+                          href={`/customer/${customer.id}`}
+                          className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                        >
+                          <User className="w-4 h-4 mr-1" />
+                          Details
+                        </Link>
+                        {customer.link && (
+                          <a 
+                            href={customer.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            Sheet
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+
+                {filteredData.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">No customers found.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>Data syncs automatically every 30 seconds</p>
-            <p className="mt-1">Showing {filteredData.length} of {balanceSheet.length} customers</p>
+            <p className="mt-1">
+              Showing {filteredData.length} of {balanceSheet.length} customers
+              {viewMode === 'customers' && ' in card view'}
+            </p>
           </div>
         </div>
       </div>
