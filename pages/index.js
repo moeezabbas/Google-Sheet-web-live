@@ -164,34 +164,54 @@ export default function Home() {
     }
 
     const balanceText = await balanceResponse.text();
-    const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
+    console.log('Raw response:', balanceText.substring(0, 200)); // Debug log
     
-    // Improved data parsing - handle empty rows and different data structures
+    const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
+    console.log('Parsed JSON structure:', balanceJson); // Debug log
+    
+    // Get all rows and properly parse them
     const rows = balanceJson.table.rows || [];
-    const balanceData = rows
-      .slice(2) // Skip header rows
-      .map((row, index) => {
-        // Safely access cell data
-        const name = row.c && row.c[0] ? (row.c[0].v || '') : '';
-        const balance = row.c && row.c[1] ? parseFloat(row.c[1].v || 0) : 0;
-        const drCr = row.c && row.c[2] ? (row.c[2].v || '') : '';
-        const link = row.c && row.c[3] ? (row.c[3].v || '') : '';
+    console.log('Total rows from sheet:', rows.length); // Debug log
+    
+    const balanceData = [];
+    
+    // Start from row 2 (index 2) to skip headers, but parse ALL valid rows
+    for (let i = 2; i < rows.length; i++) {
+      const row = rows[i];
+      
+      // Check if row exists and has cells
+      if (row && row.c) {
+        const nameCell = row.c[0];
+        const balanceCell = row.c[1];
+        const drCrCell = row.c[2];
+        const linkCell = row.c[3];
         
-        // Only include rows with customer names
-        if (name && name.trim() !== '') {
-          return {
-            id: `customer-${index}-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
-            name: name.trim(),
-            balance: balance,
-            drCr: drCr.trim().toUpperCase() || 'Nill',
-            link: link
-          };
+        // Get values safely
+        const name = nameCell ? (nameCell.v || nameCell.f || '') : '';
+        const balanceValue = balanceCell ? (balanceCell.v || balanceCell.f || '0') : '0';
+        const drCr = drCrCell ? (drCrCell.v || drCrCell.f || '') : '';
+        const link = linkCell ? (linkCell.v || linkCell.f || '') : '';
+        
+        // Clean and validate the data
+        const cleanName = name.toString().trim();
+        const cleanBalance = parseFloat(balanceValue) || 0;
+        const cleanDrCr = drCr.toString().trim().toUpperCase();
+        
+        // Only include rows that have a customer name
+        if (cleanName && cleanName !== '' && cleanName !== 'Total' && !cleanName.includes('Total')) {
+          balanceData.push({
+            id: `customer-${i}-${cleanName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+            name: cleanName,
+            balance: cleanBalance,
+            drCr: cleanDrCr || 'NILL',
+            link: link.toString().trim()
+          });
         }
-        return null;
-      })
-      .filter(item => item !== null); // Remove null entries
-
-    console.log('Parsed data:', balanceData); // Debug log
+      }
+    }
+    
+    console.log('Final parsed customers:', balanceData.length); // Debug log
+    console.log('Sample customers:', balanceData.slice(0, 5)); // Debug log
 
     setBalanceSheet(balanceData);
     
@@ -203,14 +223,17 @@ export default function Home() {
       totalCount: balanceData.length
     }));
     
-    // Calculate statistics
-    const totalDR = balanceData
-      .filter(item => item.drCr === 'DR')
-      .reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    // Calculate statistics CORRECTLY
+    const drCustomers = balanceData.filter(item => item.drCr === 'DR');
+    const crCustomers = balanceData.filter(item => item.drCr === 'CR');
+    const nillCustomers = balanceData.filter(item => item.drCr === 'NILL' || !item.drCr);
     
-    const totalCR = balanceData
-      .filter(item => item.drCr === 'CR')
-      .reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    const totalDR = drCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    const totalCR = crCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+    
+    console.log('DR Customers:', drCustomers.length, 'Total:', totalDR);
+    console.log('CR Customers:', crCustomers.length, 'Total:', totalCR);
+    console.log('Nill Customers:', nillCustomers.length);
     
     setStats({
       totalCustomers: balanceData.length,
