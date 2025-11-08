@@ -57,8 +57,8 @@ const User = ({ className }) => (
   </svg>
 );
 
-// PRE-CONFIGURED GOOGLE SHEET ID - Replace with your actual sheet ID
-const DEFAULT_SHEET_ID = '1F1X-2FVVUKQUs4HSsGpgb1Qqk7-zieKtd_E29teQ7x0';
+// PRE-CONFIGURED GOOGLE SHEET ID
+const DEFAULT_SHEET_ID = '1YOUR_DEFAULT_SHEET_ID_HERE';
 
 export default function Home() {
   const [sheetId, setSheetId] = useState('');
@@ -71,6 +71,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState('balance');
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalDR: 0,
@@ -83,35 +84,31 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (connected && sheetId) {
-      const interval = setInterval(() => {
+    let interval;
+    if (connected && sheetId && autoRefresh) {
+      interval = setInterval(() => {
+        console.log('Auto-refreshing data...');
         fetchData();
-      }, 30000);
-      return () => clearInterval(interval);
+      }, 30000); // Refresh every 30 seconds
     }
-  }, [connected, sheetId]);
+    return () => clearInterval(interval);
+  }, [connected, sheetId, autoRefresh]);
 
   const initializeApp = async () => {
     try {
       setInitializing(true);
-      
-      // Try to get saved sheet ID from localStorage
       const savedId = localStorage.getItem('ledger_sheet_id');
       
       if (savedId) {
-        // Use saved sheet ID
         setSheetId(savedId);
         await fetchData(savedId);
         setConnected(true);
       } else if (DEFAULT_SHEET_ID && DEFAULT_SHEET_ID !== '1YOUR_DEFAULT_SHEET_ID_HERE') {
-        // Use default sheet ID if configured
         setSheetId(DEFAULT_SHEET_ID);
         localStorage.setItem('ledger_sheet_id', DEFAULT_SHEET_ID);
         await fetchData(DEFAULT_SHEET_ID);
         setConnected(true);
       }
-      // If neither saved nor default ID exists, stay on connection page
-      
     } catch (err) {
       console.error('Initialization error:', err);
       setError('Failed to connect to default sheet. Please check the connection.');
@@ -150,123 +147,123 @@ export default function Home() {
   };
 
   const fetchData = async (id = sheetId) => {
-  if (!id) return;
-  
-  try {
-    const extractedId = extractSheetId(id);
+    if (!id) return;
     
-    const balanceResponse = await fetch(
-      `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet`
-    );
-    
-    if (!balanceResponse.ok) {
-      throw new Error('Could not access sheet. Make sure it is publicly accessible.');
-    }
-
-    const balanceText = await balanceResponse.text();
-    console.log('Raw response:', balanceText.substring(0, 200)); // Debug log
-    
-    const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
-    console.log('Parsed JSON structure:', balanceJson); // Debug log
-    
-    // Get all rows and properly parse them
-    const rows = balanceJson.table.rows || [];
-    console.log('Total rows from sheet:', rows.length); // Debug log
-    
-    const balanceData = [];
-    
-    // Start from row 2 (index 2) to skip headers, but parse ALL valid rows
-    for (let i = 2; i < rows.length; i++) {
-      const row = rows[i];
+    try {
+      const extractedId = extractSheetId(id);
       
-      // Check if row exists and has cells
-      if (row && row.c) {
-        const nameCell = row.c[0];
-        const balanceCell = row.c[1];
-        const drCrCell = row.c[2];
-        const linkCell = row.c[3];
+      const balanceResponse = await fetch(
+        `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=Balance%20Sheet&t=${Date.now()}`
+      );
+      
+      if (!balanceResponse.ok) {
+        throw new Error('Could not access sheet. Make sure it is publicly accessible.');
+      }
+
+      const balanceText = await balanceResponse.text();
+      const balanceJson = JSON.parse(balanceText.substring(47).slice(0, -2));
+      
+      const rows = balanceJson.table.rows || [];
+      console.log('🔍 Total rows from sheet:', rows.length);
+
+      const balanceData = [];
+      let skippedRows = 0;
+
+      // Parse all rows starting from row 3 (index 2)
+      for (let i = 2; i < rows.length; i++) {
+        const row = rows[i];
         
-        // Get values safely
-        const name = nameCell ? (nameCell.v || nameCell.f || '') : '';
-        const balanceValue = balanceCell ? (balanceCell.v || balanceCell.f || '0') : '0';
-        const drCr = drCrCell ? (drCrCell.v || drCrCell.f || '') : '';
-        const link = linkCell ? (linkCell.v || linkCell.f || '') : '';
-        
-        // Clean and validate the data
-        const cleanName = name.toString().trim();
-        const cleanBalance = parseFloat(balanceValue) || 0;
-        const cleanDrCr = drCr.toString().trim().toUpperCase();
-        
-        // Only include rows that have a customer name
-        if (cleanName && cleanName !== '' && cleanName !== 'Total' && !cleanName.includes('Total')) {
+        if (row && row.c) {
+          const nameCell = row.c[0];
+          const balanceCell = row.c[1];
+          const drCrCell = row.c[2];
+          const linkCell = row.c[3];
+          
+          // Get raw values
+          const rawName = nameCell ? (nameCell.v || nameCell.f || '') : '';
+          const rawBalance = balanceCell ? (balanceCell.v || balanceCell.f || '0') : '0';
+          const rawDrCr = drCrCell ? (drCrCell.v || drCrCell.f || '') : '';
+          const rawLink = linkCell ? (linkCell.v || linkCell.f || '') : '';
+
+          // Clean and process data
+          const cleanName = String(rawName).trim();
+          
+          // Skip empty rows and header-like rows
+          if (!cleanName || 
+              cleanName === '' || 
+              cleanName === 'Customer Name' ||
+              cleanName.toLowerCase().includes('total') ||
+              cleanName.startsWith('Count:')) {
+            skippedRows++;
+            continue;
+          }
+
+          // Parse balance - handle currency format
+          let cleanBalance = 0;
+          if (typeof rawBalance === 'number') {
+            cleanBalance = rawBalance;
+          } else {
+            const balanceText = String(rawBalance).replace(/[Rs.,\s]/g, '');
+            cleanBalance = parseFloat(balanceText) || 0;
+          }
+
+          // Parse DR/CR - handle various formats
+          let cleanDrCr = String(rawDrCr).trim().toUpperCase();
+          if (cleanDrCr === 'NIII' || cleanDrCr === 'NILL' || cleanDrCr === 'NIL') {
+            cleanDrCr = 'NILL';
+          } else if (cleanDrCr !== 'DR' && cleanDrCr !== 'CR') {
+            cleanDrCr = 'NILL';
+          }
+
           balanceData.push({
-            id: `customer-${i}-${cleanName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+            id: `customer-${i}-${cleanName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
             name: cleanName,
             balance: cleanBalance,
-            drCr: cleanDrCr || 'NILL',
-            link: link.toString().trim()
+            drCr: cleanDrCr,
+            link: String(rawLink).trim()
           });
         }
       }
+
+      console.log(`✅ Parsed ${balanceData.length} customers, skipped ${skippedRows} rows`);
+      console.log('📊 Sample data:', balanceData.slice(0, 3));
+
+      setBalanceSheet(balanceData);
+      
+      // Save complete data for customer pages
+      localStorage.setItem('ledger_sheet_data', JSON.stringify({
+        sheetId: extractedId,
+        balanceData: balanceData,
+        lastUpdated: new Date().toISOString(),
+        totalCount: balanceData.length
+      }));
+      
+      // Calculate statistics
+      const drCustomers = balanceData.filter(item => item.drCr === 'DR');
+      const crCustomers = balanceData.filter(item => item.drCr === 'CR');
+      const nillCustomers = balanceData.filter(item => item.drCr === 'NILL');
+      
+      const totalDR = drCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+      const totalCR = crCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+      
+      console.log(`📈 Stats: DR=${drCustomers.length}, CR=${crCustomers.length}, NILL=${nillCustomers.length}`);
+      console.log(`💰 Totals: DR=Rs.${totalDR}, CR=Rs.${totalCR}`);
+
+      setStats({
+        totalCustomers: balanceData.length,
+        totalDR,
+        totalCR,
+        netPosition: totalDR - totalCR
+      });
+
+      setLastUpdate(new Date());
+      setError('');
+      
+    } catch (err) {
+      console.error('❌ Fetch error:', err);
+      setError('Failed to fetch data. Check sheet permissions and try again.');
     }
-    
-    console.log('Final parsed customers:', balanceData.length); // Debug log
-    console.log('Sample customers:', balanceData.slice(0, 5)); // Debug log
-
-    setBalanceSheet(balanceData);
-    const debugSheetStructure = (balanceJson) => {
-  console.log('=== SHEET STRUCTURE DEBUG ===');
-  const rows = balanceJson.table.rows || [];
-  
-  rows.forEach((row, index) => {
-    console.log(`Row ${index}:`, {
-      hasCells: !!row.c,
-      cellCount: row.c ? row.c.length : 0,
-      cells: row.c ? row.c.map(cell => ({
-        value: cell?.v,
-        formatted: cell?.f,
-        type: typeof cell?.v
-      })) : 'No cells'
-    });
-  });
-  
-  console.log('=== END DEBUG ===');
-};
-    // Save to localStorage for customer pages
-    localStorage.setItem('ledger_sheet_data', JSON.stringify({
-      sheetId: extractedId,
-      balanceData: balanceData,
-      lastUpdated: new Date().toISOString(),
-      totalCount: balanceData.length
-    }));
-    
-    // Calculate statistics CORRECTLY
-    const drCustomers = balanceData.filter(item => item.drCr === 'DR');
-    const crCustomers = balanceData.filter(item => item.drCr === 'CR');
-    const nillCustomers = balanceData.filter(item => item.drCr === 'NILL' || !item.drCr);
-    
-    const totalDR = drCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
-    const totalCR = crCustomers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
-    
-    console.log('DR Customers:', drCustomers.length, 'Total:', totalDR);
-    console.log('CR Customers:', crCustomers.length, 'Total:', totalCR);
-    console.log('Nill Customers:', nillCustomers.length);
-    
-    setStats({
-      totalCustomers: balanceData.length,
-      totalDR,
-      totalCR,
-      netPosition: totalDR - totalCR
-    });
-
-    setLastUpdate(new Date());
-    setError('');
-    
-  } catch (err) {
-    console.error('Fetch error:', err);
-    setError('Failed to fetch data. Check sheet permissions and try again.');
-  }
-};
+  };
 
   const disconnect = () => {
     setConnected(false);
@@ -288,7 +285,7 @@ export default function Home() {
       filterType === 'all' ||
       (filterType === 'dr' && item.drCr === 'DR') ||
       (filterType === 'cr' && item.drCr === 'CR') ||
-      (filterType === 'nill' && item.drCr === 'Nill');
+      (filterType === 'nill' && item.drCr === 'NILL');
     return matchesSearch && matchesFilter;
   });
 
@@ -296,7 +293,8 @@ export default function Home() {
     return new Intl.NumberFormat('en-PK', {
       style: 'currency',
       currency: 'PKR',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
   };
 
@@ -423,12 +421,26 @@ export default function Home() {
                 <div className="text-sm text-blue-100 bg-white/20 px-3 py-1 rounded-lg">
                   Sheet: {sheetId.substring(0, 8)}...
                 </div>
+                
+                {/* Auto-refresh Toggle */}
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`flex items-center px-4 py-2 rounded-lg transition-colors text-sm ${
+                    autoRefresh 
+                      ? 'bg-green-500 hover:bg-green-600' 
+                      : 'bg-gray-500 hover:bg-gray-600'
+                  }`}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  {autoRefresh ? 'Auto On' : 'Auto Off'}
+                </button>
+
                 <button
                   onClick={() => fetchData()}
                   className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
+                  Refresh Now
                 </button>
                 
                 <button
@@ -443,6 +455,13 @@ export default function Home() {
         </header>
 
         <div className="container mx-auto px-4 py-6">
+          {/* Debug Info - Remove in production */}
+          <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 text-sm">
+            <strong>Debug Info:</strong> Sheet has 79 rows → Parsed {stats.totalCustomers} customers | 
+            Auto-refresh: {autoRefresh ? 'ON' : 'OFF'} | 
+            Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}
+          </div>
+
           {/* View Mode Toggle */}
           <div className="flex gap-2 mb-6">
             <button
@@ -468,22 +487,7 @@ export default function Home() {
               Customer View
             </button>
           </div>
-{/* Debug Button - Remove after testing */}
-<div className="mb-4">
-  <button
-    onClick={() => {
-      const savedData = localStorage.getItem('ledger_sheet_data');
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        console.log('Current stored data:', data);
-        alert(`Stored customers: ${data.balanceData.length}\nCheck console for details.`);
-      }
-    }}
-    className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm"
-  >
-    Debug Data
-  </button>
-</div>
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -568,6 +572,14 @@ export default function Home() {
                 >
                   CR
                 </button>
+                <button
+                  onClick={() => setFilterType('nill')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterType === 'nill' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  NILL
+                </button>
               </div>
             </div>
           </div>
@@ -580,6 +592,7 @@ export default function Home() {
                 {lastUpdate && (
                   <p className="text-sm text-blue-100">
                     Last updated: {lastUpdate.toLocaleTimeString()}
+                    {autoRefresh && ' (Auto-refresh ON)'}
                   </p>
                 )}
               </div>
@@ -604,7 +617,7 @@ export default function Home() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredData.map((customer, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                      <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <span className="font-medium text-gray-900 text-sm">{customer.name}</span>
                         </td>
@@ -633,22 +646,18 @@ export default function Home() {
                               <User className="w-3 h-3 mr-1" />
                               View
                             </Link>
-                            {customer.link && customer.link.startsWith('http') && (
-  <a 
-    href={customer.link} 
-    target="_blank" 
-    rel="noopener noreferrer"
-    className="inline-flex items-center px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors"
-    onClick={(e) => {
-      e.stopPropagation();
-      // Force link to open
-      window.open(customer.link, '_blank', 'noopener,noreferrer');
-    }}
-  >
-    <ExternalLink className="w-3 h-3 mr-1" />
-    Sheet
-  </a>
-)}
+                            {customer.link && customer.link.includes('H_View') && (
+                              <button
+                                onClick={() => {
+                                  const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`;
+                                  window.open(sheetUrl, '_blank', 'noopener,noreferrer');
+                                }}
+                                className="inline-flex items-center px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Sheet
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -677,8 +686,8 @@ export default function Home() {
 
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredData.map((customer, index) => (
-                    <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                  {filteredData.map((customer) => (
+                    <div key={customer.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-gray-800 text-lg truncate">
                           {customer.name}
@@ -713,16 +722,17 @@ export default function Home() {
                           <User className="w-4 h-4 mr-1" />
                           Details
                         </Link>
-                        {customer.link && (
-                          <a 
-                            href={customer.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                        {customer.link && customer.link.includes('H_View') && (
+                          <button
+                            onClick={() => {
+                              const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`;
+                              window.open(sheetUrl, '_blank', 'noopener,noreferrer');
+                            }}
                             className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4 mr-1" />
                             Sheet
-                          </a>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -739,7 +749,7 @@ export default function Home() {
           )}
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Data syncs automatically every 30 seconds</p>
+            <p>Data {autoRefresh ? 'syncs automatically every 30 seconds' : 'refresh is manual'}</p>
             <p className="mt-1">
               Showing {filteredData.length} of {balanceSheet.length} customers
               {viewMode === 'customers' && ' in card view'}
